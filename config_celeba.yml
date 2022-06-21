@@ -1,0 +1,40 @@
+---
+seed: 4
+output: fitz_dark_young.json
+protected_attr: Fitz_Dark
+prediction_attr: Young
+metric: aod
+trainsize: 40000
+testsize: 10000
+num_workers: 4
+print_priors: False
+retrain: False
+optimizer: sgd
+batch_size: 32
+lr: 0.001
+epochs: 10
+checkpoint: test_checkpoint.pt
+objective:
+  epsilon: 0.05
+models:
+  - default
+  - layerwiseOpt
+  - random
+  - adversarial
+  - ROC
+  - EqOdds
+  - CalibEqOdds
+CalibEqOdds:
+  cost_constraint: fpr
+random:
+  checkpoint: random_checkpoint.pt
+layerwiseOpt:
+  max_sparsity: 5000
+  num_layers: 5
+adversarial:
+  margin: 0.01
+  epochs: 10
+  critic_steps: 301
+  actor_steps: 401
+  lambda: 20
+  checkpoint: adversarial_checkpoint.pt
