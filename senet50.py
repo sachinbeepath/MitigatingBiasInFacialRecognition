@@ -20,7 +20,7 @@ warnings.filterwarnings('ignore')
 import math
 device = torch.device("mps" if torch.has_mps else "cpu")
 
-__all__ = ['ResNet', 'resnet50']
+__all__ = ['SENet', 'senet50']
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -75,6 +75,13 @@ class Bottleneck(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
+        # SENet
+        compress_rate = 16
+        # self.se_block = SEModule(planes * 4, compress_rate)  # this is not used.
+        self.conv4 = nn.Conv2d(planes * 4, planes * 4 // compress_rate, kernel_size=1, stride=1, bias=True)
+        self.conv5 = nn.Conv2d(planes * 4 // compress_rate, planes * 4, kernel_size=1, stride=1, bias=True)
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, x):
         residual = x
 
@@ -89,20 +96,29 @@ class Bottleneck(nn.Module):
         out = self.conv3(out)
         out = self.bn3(out)
 
+
+        ## senet
+        out2 = F.avg_pool2d(out, kernel_size=out.size(2))
+        out2 = self.conv4(out2)
+        out2 = self.relu(out2)
+        out2 = self.conv5(out2)
+        out2 = self.sigmoid(out2)
+        # out2 = self.se_block.forward(out)  # not used
+
         if self.downsample is not None:
             residual = self.downsample(x)
 
-        out += residual
+        out = out2 * out + residual
+        # out = out2 + residual  # not used
         out = self.relu(out)
-
         return out
 
 
-class ResNet(nn.Module):
+class SENet(nn.Module):
 
     def __init__(self, block, layers, num_classes=8631, include_top=False):
         self.inplanes = 64
-        super(ResNet, self).__init__()
+        super(SENet, self).__init__()
         self.include_top = include_top
         
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -147,7 +163,6 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -162,15 +177,16 @@ class ResNet(nn.Module):
         x = self.fc(x)
         return x
 
-def resnet50(**kwargs):
-    """Constructs a ResNet-50 model.
+
+def senet50(**kwargs):
+    """Constructs a SENet-50 model.
     """
-    model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
+    model = SENet(Bottleneck, [3, 4, 6, 3], **kwargs)
     return model
 
 def make_model():
-    model_ft = resnet50()
-    fname = 'weights/resnet50_ft_weight.pkl'
+    model_ft = senet50()
+    fname = 'weights/senet50_ft_weight.pkl'
 
     with open(fname, 'rb') as f:
         weights = pickle.load(f, encoding='latin1')
